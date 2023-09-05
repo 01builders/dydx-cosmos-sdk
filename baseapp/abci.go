@@ -359,9 +359,6 @@ func (app *BaseApp) ApplySnapshotChunk(req *abci.RequestApplySnapshotChunk) (*ab
 // will contain relevant error information. Regardless of tx execution outcome,
 // the ResponseCheckTx will contain relevant gas execution context.
 func (app *BaseApp) CheckTx(req *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
-	app.mtx.Lock()
-	defer app.mtx.Unlock()
-
 	var mode execMode
 
 	switch req.Type {
@@ -376,7 +373,7 @@ func (app *BaseApp) CheckTx(req *abci.RequestCheckTx) (*abci.ResponseCheckTx, er
 	}
 
 	if app.checkTxHandler == nil {
-		gInfo, result, anteEvents, err := app.runTx(mode, req.Tx, nil)
+		gInfo, result, anteEvents, err := app.runCheckTxConcurrently(mode, req.Tx, nil)
 		if err != nil {
 			return sdkerrors.ResponseCheckTxWithEvents(err, gInfo.GasWanted, gInfo.GasUsed, anteEvents, app.trace), nil
 		}
@@ -391,11 +388,11 @@ func (app *BaseApp) CheckTx(req *abci.RequestCheckTx) (*abci.ResponseCheckTx, er
 	}
 
 	// Create wrapper to avoid users overriding the execution mode
-	runTx := func(txBytes []byte, tx sdk.Tx) (gInfo sdk.GasInfo, result *sdk.Result, anteEvents []abci.Event, err error) {
-		return app.runTx(mode, txBytes, tx)
+	runCheckTxConcurrently := func(txBytes []byte, tx sdk.Tx) (gInfo sdk.GasInfo, result *sdk.Result, anteEvents []abci.Event, err error) {
+		return app.runCheckTxConcurrently(mode, txBytes, tx)
 	}
 
-	return app.checkTxHandler(runTx, req)
+	return app.checkTxHandler(runCheckTxConcurrently, req)
 }
 
 // PrepareProposal implements the PrepareProposal ABCI method and returns a
