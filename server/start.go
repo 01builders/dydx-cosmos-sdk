@@ -123,7 +123,7 @@ type StartCmdOptions struct {
 	// AddFlags add custom flags to start cmd
 	AddFlags func(cmd *cobra.Command)
 	// StartCommandHanlder can be used to customize the start command handler
-	StartCommandHandler func(svrCtx *Context, clientCtx client.Context, appCreator types.AppCreator, inProcessConsensus bool, opts StartCmdOptions) error
+	StartCommandHandler func(parentCtx context.Context, svrCtx *Context, clientCtx client.Context, appCreator types.AppCreator, inProcessConsensus bool, opts StartCmdOptions) error
 }
 
 // StartCmd runs the service passed in, either stand-alone or in-process with
@@ -192,7 +192,7 @@ is performed. Note, when enabled, gRPC will also be automatically enabled.
 			}
 
 			err = wrapCPUProfile(serverCtx, func() error {
-				return opts.StartCommandHandler(serverCtx, clientCtx, appCreator, withCMT, opts)
+				return opts.StartCommandHandler(cmd.Context(), serverCtx, clientCtx, appCreator, withCMT, opts)
 			})
 
 			serverCtx.Logger.Debug("received quit signal")
@@ -212,13 +212,13 @@ is performed. Note, when enabled, gRPC will also be automatically enabled.
 	return cmd
 }
 
-func start(svrCtx *Context, clientCtx client.Context, appCreator types.AppCreator, withCmt bool, opts StartCmdOptions) error {
+func start(parentCtx context.Context, svrCtx *Context, clientCtx client.Context, appCreator types.AppCreator, withCmt bool, opts StartCmdOptions) error {
 	svrCfg, err := getAndValidateConfig(svrCtx)
 	if err != nil {
 		return err
 	}
 
-	app, appCleanupFn, err := startApp(svrCtx, appCreator, opts)
+	app, appCleanupFn, err := startApp(parentCtx, svrCtx, appCreator, opts)
 	if err != nil {
 		return err
 	}
@@ -232,12 +232,12 @@ func start(svrCtx *Context, clientCtx client.Context, appCreator types.AppCreato
 	emitServerInfoMetrics()
 
 	if !withCmt {
-		return startStandAlone(svrCtx, svrCfg, clientCtx, app, metrics, opts)
+		return startStandAlone(parentCtx, svrCtx, svrCfg, clientCtx, app, metrics, opts)
 	}
-	return startInProcess(svrCtx, svrCfg, clientCtx, app, metrics, opts)
+	return startInProcess(parentCtx, svrCtx, svrCfg, clientCtx, app, metrics, opts)
 }
 
-func startStandAlone(svrCtx *Context, svrCfg serverconfig.Config, clientCtx client.Context, app types.Application, metrics *telemetry.Metrics, opts StartCmdOptions) error {
+func startStandAlone(parentCtx context.Context, svrCtx *Context, svrCfg serverconfig.Config, clientCtx client.Context, app types.Application, metrics *telemetry.Metrics, opts StartCmdOptions) error {
 	addr := svrCtx.Viper.GetString(flagAddress)
 	transport := svrCtx.Viper.GetString(flagTransport)
 
@@ -249,7 +249,7 @@ func startStandAlone(svrCtx *Context, svrCfg serverconfig.Config, clientCtx clie
 
 	svr.SetLogger(servercmtlog.CometLoggerWrapper{Logger: svrCtx.Logger.With("module", "abci-server")})
 
-	g, ctx := getCtx(svrCtx, false)
+	g, ctx := getCtx(parentCtx, svrCtx, false)
 
 	// Add the tx service to the gRPC router. We only need to register this
 	// service if API or gRPC is enabled, and avoid doing so in the general
@@ -303,13 +303,13 @@ func startStandAlone(svrCtx *Context, svrCfg serverconfig.Config, clientCtx clie
 	return g.Wait()
 }
 
-func startInProcess(svrCtx *Context, svrCfg serverconfig.Config, clientCtx client.Context, app types.Application,
+func startInProcess(parentCtx context.Context, svrCtx *Context, svrCfg serverconfig.Config, clientCtx client.Context, app types.Application,
 	metrics *telemetry.Metrics, opts StartCmdOptions,
 ) error {
 	cmtCfg := svrCtx.Config
 	gRPCOnly := svrCtx.Viper.GetBool(flagGRPCOnly)
 
-	g, ctx := getCtx(svrCtx, true)
+	g, ctx := getCtx(parentCtx, svrCtx, true)
 
 	if gRPCOnly {
 		// TODO: Generalize logic so that gRPC only is really in startStandAlone
@@ -587,15 +587,15 @@ func emitServerInfoMetrics() {
 	telemetry.SetGaugeWithLabels([]string{"server", "info"}, 1, ls)
 }
 
-func getCtx(svrCtx *Context, block bool) (*errgroup.Group, context.Context) {
-	ctx, cancelFn := context.WithCancel(context.Background())
+func getCtx(parentCtx context.Context, svrCtx *Context, block bool) (*errgroup.Group, context.Context) {
+	ctx, cancelFn := context.WithCancel(parentCtx)
 	g, ctx := errgroup.WithContext(ctx)
 	// listen for quit signals so the calling parent process can gracefully exit
-	ListenForQuitSignals(g, block, cancelFn, svrCtx.Logger)
+	ListenForQuitSignals(parentCtx, g, block, cancelFn, svrCtx.Logger)
 	return g, ctx
 }
 
-func startApp(svrCtx *Context, appCreator types.AppCreator, opts StartCmdOptions) (app types.Application, cleanupFn func(), err error) {
+func startApp(parentCtx context.Context, svrCtx *Context, appCreator types.AppCreator, opts StartCmdOptions) (app types.Application, cleanupFn func(), err error) {
 	traceWriter, traceCleanupFn, err := setupTraceWriter(svrCtx)
 	if err != nil {
 		return app, traceCleanupFn, err
@@ -608,7 +608,7 @@ func startApp(svrCtx *Context, appCreator types.AppCreator, opts StartCmdOptions
 	}
 
 	if isTestnet, ok := svrCtx.Viper.Get(KeyIsTestnet).(bool); ok && isTestnet {
-		app, err = testnetify(svrCtx, appCreator, db, traceWriter)
+		app, err = testnetify(parentCtx, svrCtx, appCreator, db, traceWriter)
 		if err != nil {
 			return app, traceCleanupFn, err
 		}
@@ -702,7 +702,7 @@ you want to test the upgrade handler itself.
 			serverCtx.Viper.Set(KeyNewOpAddr, newOperatorAddress)
 
 			err = wrapCPUProfile(serverCtx, func() error {
-				return opts.StartCommandHandler(serverCtx, clientCtx, testnetAppCreator, withCMT, opts)
+				return opts.StartCommandHandler(cmd.Context(), serverCtx, clientCtx, testnetAppCreator, withCMT, opts)
 			})
 
 			serverCtx.Logger.Debug("received quit signal")
@@ -725,7 +725,7 @@ you want to test the upgrade handler itself.
 
 // testnetify modifies both state and blockStore, allowing the provided operator address and local validator key to control the network
 // that the state in the data folder represents. The chainID of the local genesis file is modified to match the provided chainID.
-func testnetify(ctx *Context, testnetAppCreator types.AppCreator, db dbm.DB, traceWriter io.WriteCloser) (types.Application, error) {
+func testnetify(parentCtx context.Context, ctx *Context, testnetAppCreator types.AppCreator, db dbm.DB, traceWriter io.WriteCloser) (types.Application, error) {
 	config := ctx.Config
 
 	newChainID, ok := ctx.Viper.Get(KeyNewChainID).(string)
@@ -800,7 +800,7 @@ func testnetify(ctx *Context, testnetAppCreator types.AppCreator, db dbm.DB, tra
 	// Depending on how the node was stopped, the application height can differ from the blockStore height.
 	// This height difference changes how we go about modifying the state.
 	cmtApp := NewCometABCIWrapper(testnetApp)
-	_, context := getCtx(ctx, true)
+	_, context := getCtx(parentCtx, ctx, true)
 	clientCreator := proxy.NewLocalClientCreator(cmtApp)
 	metrics := node.DefaultMetricsProvider(cmtcfg.DefaultConfig().Instrumentation)
 	_, _, _, _, proxyMetrics, _, _ := metrics(genDoc.ChainID)
