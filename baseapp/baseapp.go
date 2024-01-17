@@ -198,6 +198,9 @@ type BaseApp struct {
 	//
 	// SAFETY: it's safe to do if validators validate the total gas wanted in the `ProcessProposal`, which is the case in the default handler.
 	disableBlockGasMeter bool
+
+	// Used to synchronize the application when using an unsynchronized ABCI++ client.
+	mtx sync.Mutex
 }
 
 // NewBaseApp returns a reference to an initialized BaseApp. It accepts a
