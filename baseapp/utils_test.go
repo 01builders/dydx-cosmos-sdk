@@ -224,8 +224,7 @@ func counterEvent(evType string, msgCount int64) sdk.Events {
 
 func anteHandlerTxTest(t *testing.T, capKey storetypes.StoreKey, storeKey []byte) sdk.AnteHandler {
 	t.Helper()
-
-	return func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
+	return wrapWithLockAndCacheContextDecorator(func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
 		store := ctx.KVStore(capKey)
 		counter, failOnAnte := parseTxMemo(t, tx)
 
@@ -244,7 +243,7 @@ func anteHandlerTxTest(t *testing.T, capKey storetypes.StoreKey, storeKey []byte
 
 		ctx = ctx.WithPriority(testTxPriority)
 		return ctx, nil
-	}
+	})
 }
 
 func incrementingCounter(t *testing.T, store storetypes.KVStore, counterKey []byte, counter int64) (*sdk.Result, error) {
