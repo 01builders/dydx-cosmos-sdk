@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/cockroachdb/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -21,6 +22,7 @@ import (
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
 	storemetrics "cosmossdk.io/store/metrics"
+	"cosmossdk.io/store/rootmulti"
 	"cosmossdk.io/store/snapshots"
 	storetypes "cosmossdk.io/store/types"
 
@@ -193,6 +195,13 @@ type BaseApp struct {
 	//
 	// SAFETY: it's safe to do if validators validate the total gas wanted in the `ProcessProposal`, which is the case in the default handler.
 	disableBlockGasMeter bool
+
+	// Used to synchronize the application when using an unsynchronized ABCI++ client.
+	mtx sync.RWMutex
+
+	// Used to synchronize CacheMultistoreWithVersion since the multistore mutates version
+	// information internally during first time loads leading to data races.
+	cacheMsWithVersionMtx sync.Mutex
 }
 
 // NewBaseApp returns a reference to an initialized BaseApp. It accepts a
@@ -477,7 +486,14 @@ func (app *BaseApp) IsSealed() bool { return app.sealed }
 // multi-store (i.e. a CacheMultiStore) and a new Context with the same
 // multi-store branch, and provided header.
 func (app *BaseApp) setState(mode execMode, h cmtproto.Header) {
-	ms := app.cms.CacheMultiStore()
+	var ms storetypes.CacheMultiStore
+	if mode == execModeCheck {
+		// Only support locking during check state. All other exec modes currently hold an exclusive lock on `mtx`
+		// and can use a normal branched multi store.
+		ms = app.cms.(*rootmulti.Store).LockingCacheMultiStore()
+	} else {
+		ms = app.cms.CacheMultiStore()
+	}
 	headerInfo := header.Info{
 		Height:  h.Height,
 		Time:    h.Time,
