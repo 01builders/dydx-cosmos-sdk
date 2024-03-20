@@ -22,6 +22,7 @@ MOCKS_DIR = $(CURDIR)/tests/mocks
 HTTPS_GIT := https://github.com/cosmos/cosmos-sdk.git
 DOCKER := $(shell which docker)
 PROJECT_NAME = $(shell git remote get-url origin | xargs basename -s .git)
+CGO_ENABLED=1
 
 # process build tags
 build_tags = netgo
@@ -46,10 +47,6 @@ ifeq ($(LEDGER_ENABLED),true)
 		endif
 	endif
 	endif
-endif
-
-ifeq (secp,$(findstring secp,$(COSMOS_BUILD_OPTIONS)))
-  build_tags += libsecp256k1_sdk
 endif
 
 ifeq (legacy,$(findstring legacy,$(COSMOS_BUILD_OPTIONS)))
