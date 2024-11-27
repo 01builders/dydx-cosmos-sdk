@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	abci "github.com/cometbft/cometbft/abci/types"
 )
 
@@ -27,6 +29,10 @@ type PrepareProposalHandler func(Context, *abci.RequestPrepareProposal) (*abci.R
 // `RunTx` is a function type alias for executing logic before transactions are executed.
 // The passed in runtx does not override antehandlers, the execution mode is not passed into runtx to avoid overriding the execution mode.
 type CheckTxHandler func(RunTx, *abci.RequestCheckTx) (*abci.ResponseCheckTx, error)
+
+// BlockDelayGetter defines a function type for getting the `next_block_delay` (previously `timeout_commit`)
+// from the application. Returns `0` if the application has no opinion.
+type BlockDelayGetter func(Context) time.Duration
 
 // ExtendVoteHandler defines a function type alias for extending a pre-commit vote.
 type ExtendVoteHandler func(Context, *abci.RequestExtendVote) (*abci.ResponseExtendVote, error)
