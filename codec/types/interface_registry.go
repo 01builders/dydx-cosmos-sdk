@@ -283,7 +283,11 @@ func (registry *interfaceRegistry) ListImplementations(ifaceName string) []strin
 	return keys
 }
 
+<<<<<<< HEAD
 func (registry *interfaceRegistry) UnpackAny(any *Any, iface any) error {
+=======
+func (registry *interfaceRegistry) UnpackAny(any *Any, iface interface{}) error {
+>>>>>>> cc8700e0d9 (Patch for ASA-2024-0012 and 0013. (#61))
 	unpacker := &statefulUnpacker{
 		registry: registry,
 		maxDepth: MaxUnpackAnyRecursionDepth,
@@ -317,10 +321,17 @@ func (r statefulUnpacker) cloneForRecursion() *statefulUnpacker {
 // UnpackAny deserializes a protobuf Any message into the provided interface, ensuring the interface is a pointer.
 // It applies stateful constraints such as max depth and call limits, and unpacks interfaces if required.
 func (r *statefulUnpacker) UnpackAny(any *Any, iface interface{}) error {
+<<<<<<< HEAD
 	if r.maxDepth <= 0 {
 		return errors.New("max depth exceeded")
 	}
 	if r.maxCalls.count <= 0 {
+=======
+	if r.maxDepth == 0 {
+		return errors.New("max depth exceeded")
+	}
+	if r.maxCalls.count == 0 {
+>>>>>>> cc8700e0d9 (Patch for ASA-2024-0012 and 0013. (#61))
 		return errors.New("call limit exceeded")
 	}
 	// here we gracefully handle the case in which `any` itself is `nil`, which may occur in message decoding
