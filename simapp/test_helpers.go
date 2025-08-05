@@ -58,7 +58,7 @@ func NewSimappWithCustomOptions(t *testing.T, isCheckTx bool, options SetupOptio
 	pubKey, err := privVal.GetPubKey()
 	require.NoError(t, err)
 	// create validator set with single validator
-	validator := cmttypes.NewValidator(pubKey, 1)
+	validator := cmttypes.NewValidator(pubKey, 1, true)
 	valSet := cmttypes.NewValidatorSet([]*cmttypes.Validator{validator})
 
 	// generate genesis account
@@ -100,7 +100,7 @@ func Setup(t *testing.T, isCheckTx bool) *SimApp {
 	require.NoError(t, err)
 
 	// create validator set with single validator
-	validator := cmttypes.NewValidator(pubKey, 1)
+	validator := cmttypes.NewValidator(pubKey, 1, true)
 	valSet := cmttypes.NewValidatorSet([]*cmttypes.Validator{validator})
 
 	// generate genesis account
@@ -160,7 +160,7 @@ func GenesisStateWithSingleValidator(t *testing.T, app *SimApp) GenesisState {
 	require.NoError(t, err)
 
 	// create validator set with single validator
-	validator := cmttypes.NewValidator(pubKey, 1)
+	validator := cmttypes.NewValidator(pubKey, 1, true)
 	valSet := cmttypes.NewValidatorSet([]*cmttypes.Validator{validator})
 
 	// generate genesis account

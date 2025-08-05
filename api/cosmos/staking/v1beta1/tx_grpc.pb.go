@@ -26,6 +26,7 @@ const (
 	Msg_Undelegate_FullMethodName                = "/cosmos.staking.v1beta1.Msg/Undelegate"
 	Msg_CancelUnbondingDelegation_FullMethodName = "/cosmos.staking.v1beta1.Msg/CancelUnbondingDelegation"
 	Msg_UpdateParams_FullMethodName              = "/cosmos.staking.v1beta1.Msg/UpdateParams"
+	Msg_SetProposers_FullMethodName              = "/cosmos.staking.v1beta1.Msg/SetProposers"
 )
 
 // MsgClient is the client API for Msg service.
@@ -53,6 +54,8 @@ type MsgClient interface {
 	// UpdateParams defines an operation for updating the x/staking module
 	// parameters.
 	UpdateParams(ctx context.Context, in *MsgUpdateParams, opts ...grpc.CallOption) (*MsgUpdateParamsResponse, error)
+	// SetProposers defines a governance operation for setting which validators can propose blocks.
+	SetProposers(ctx context.Context, in *MsgSetProposers, opts ...grpc.CallOption) (*MsgSetProposersResponse, error)
 }
 
 type msgClient struct {
@@ -133,6 +136,15 @@ func (c *msgClient) UpdateParams(ctx context.Context, in *MsgUpdateParams, opts 
 	return out, nil
 }
 
+func (c *msgClient) SetProposers(ctx context.Context, in *MsgSetProposers, opts ...grpc.CallOption) (*MsgSetProposersResponse, error) {
+	out := new(MsgSetProposersResponse)
+	err := c.cc.Invoke(ctx, Msg_SetProposers_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 // All implementations must embed UnimplementedMsgServer
 // for forward compatibility.
@@ -158,6 +170,8 @@ type MsgServer interface {
 	// UpdateParams defines an operation for updating the x/staking module
 	// parameters.
 	UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error)
+	// SetProposers defines a governance operation for setting which validators can propose blocks.
+	SetProposers(context.Context, *MsgSetProposers) (*MsgSetProposersResponse, error)
 	mustEmbedUnimplementedMsgServer()
 }
 
@@ -188,6 +202,9 @@ func (UnimplementedMsgServer) CancelUnbondingDelegation(context.Context, *MsgCan
 }
 func (UnimplementedMsgServer) UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateParams not implemented")
+}
+func (UnimplementedMsgServer) SetProposers(context.Context, *MsgSetProposers) (*MsgSetProposersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetProposers not implemented")
 }
 func (UnimplementedMsgServer) mustEmbedUnimplementedMsgServer() {}
 func (UnimplementedMsgServer) testEmbeddedByValue()             {}
@@ -336,6 +353,24 @@ func _Msg_UpdateParams_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_SetProposers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgSetProposers)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).SetProposers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_SetProposers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).SetProposers(ctx, req.(*MsgSetProposers))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Msg_ServiceDesc is the grpc.ServiceDesc for Msg service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -370,6 +405,10 @@ var Msg_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateParams",
 			Handler:    _Msg_UpdateParams_Handler,
+		},
+		{
+			MethodName: "SetProposers",
+			Handler:    _Msg_SetProposers_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

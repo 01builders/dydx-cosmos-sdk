@@ -146,6 +146,29 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 		return nil, fmt.Errorf("failed to get last validator set: %w", err)
 	}
 
+	// Check if a full proposer set update is needed
+	sendFullProposerSetUpdate, err := k.GetSendFullProposerSetAbciUpdate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get proposers to properly set `CanPropose` of validator updates
+	proposers, err := k.GetProposers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	proposerMap := make(map[string]bool)
+	for _, proposer := range proposers {
+		proposerMap[proposer] = true
+	}
+
+	canPropose := func(validatorOpAddr string) bool {
+		return len(proposers) == 0 || proposerMap[validatorOpAddr]
+	}
+
+	var updatedProposers []string // for sanity check later
+
 	// Iterate over validators, highest power to lowest.
 	iterator, err := k.ValidatorsPowerStoreIterator(ctx)
 	if err != nil {
@@ -197,9 +220,15 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 		oldPower, found := last[valAddrStr]
 		newPower := validator.ConsensusPower(powerReduction)
 
-		// update the validator set if power has changed
-		if !found || oldPower != newPower {
-			updates = append(updates, validator.ABCIValidatorUpdate(powerReduction))
+		// update the validator set if power has changed or if a full proposer set update is needed
+		if !found || oldPower != newPower || sendFullProposerSetUpdate {
+			cp := canPropose(validator.GetOperator())
+			update := validator.ABCIValidatorUpdate(powerReduction, cp)
+			updates = append(updates, update)
+
+			if cp {
+				updatedProposers = append(updatedProposers, validator.GetOperator())
+			}
 
 			if err = k.SetLastValidatorPower(ctx, valAddr, newPower); err != nil {
 				return nil, err
@@ -235,7 +264,34 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx context.Context) (updates 
 			return nil, err
 		}
 
-		updates = append(updates, validator.ABCIValidatorUpdateZero())
+		cp := canPropose(validator.GetOperator())
+		update := validator.ABCIValidatorUpdateZero(cp)
+		updates = append(updates, update)
+
+		if cp {
+			updatedProposers = append(updatedProposers, validator.GetOperator())
+		}
+	}
+
+	if sendFullProposerSetUpdate {
+		// Sanity check on full proposer set update
+		if err := k.checkProposerSetInvariants(ctx, updatedProposers); err != nil {
+			// Log error and default to every validator can propose
+			sdk.UnwrapSDKContext(ctx).Logger().Error(
+				"Proposer set sanity check failed, defaulting all validators to CanPropose=true",
+				"error",
+				err,
+			)
+
+			for i := range updates {
+				updates[i].CanPropose = true
+			}
+		}
+
+		// Set full update flag back to false
+		if err := k.SetSendFullProposerSetAbciUpdate(ctx, false); err != nil {
+			return nil, err
+		}
 	}
 
 	// Update the pools based on the recent updates in the validator set:

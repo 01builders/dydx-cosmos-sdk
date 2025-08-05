@@ -59,6 +59,11 @@ var (
 
 	// NOTE: keys in range 0x81–0x87 were previously used in liquid staking forks of the staking module.
 	// Module developers MUST NOT use these keys and MUST consider them "reserved".
+	// key for proposer set
+	// Note: all validators default to being proposers if proposer set is empty
+	ProposerSetKey = []byte("PS")
+
+	SendFullProposerSetAbciUpdateKey = []byte("SFPS") // key for whether a full proposer set abci update is needed
 )
 
 // UnbondingType defines the type of unbonding operation
