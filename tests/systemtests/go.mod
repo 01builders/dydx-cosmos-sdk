@@ -1,6 +1,8 @@
 module cosmossdk.io/tests/systemtests
 
-go 1.23.2
+go 1.23.5
+
+toolchain go1.24.5
 
 replace (
 	// always use latest versions in tests
@@ -11,7 +13,7 @@ replace (
 require (
 	cosmossdk.io/math v1.5.3
 	cosmossdk.io/systemtests v1.2.1
-	github.com/cosmos/cosmos-sdk v0.53.0
+	github.com/cosmos/cosmos-sdk v0.53.4
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
@@ -66,6 +68,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.8.0 // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
+	github.com/ethereum/go-ethereum v1.16.2 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
@@ -80,7 +83,7 @@ require (
 	github.com/golang/glog v1.2.4 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
+	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/flatbuffers v1.12.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -169,3 +172,7 @@ require (
 	pgregory.net/rapid v1.2.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
+
+replace github.com/cometbft/cometbft => github.com/01builders/dydx-cometbft v0.38.17-dydx-3
+
+replace cosmossdk.io/store => github.com/01builders/dydx-cosmos-sdk/store v1.1.2-dydx
