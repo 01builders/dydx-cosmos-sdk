@@ -34,9 +34,11 @@ type Factory struct {
 	sequence              uint64
 	gas                   uint64
 	timeoutHeight         uint64
+	timeoutTimestamp      time.Time
 	gasAdjustment         float64
 	chainID               string
 	fromName              string
+	unordered             bool
 	offline               bool
 	generateOnly          bool
 	memo                  string
