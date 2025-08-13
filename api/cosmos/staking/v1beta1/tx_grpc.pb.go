@@ -51,8 +51,8 @@ type MsgClient interface {
 	// CancelUnbondingDelegation defines a method for performing canceling the unbonding delegation
 	// and delegate back to previous validator.
 	CancelUnbondingDelegation(ctx context.Context, in *MsgCancelUnbondingDelegation, opts ...grpc.CallOption) (*MsgCancelUnbondingDelegationResponse, error)
-	// UpdateParams defines an operation for updating the x/staking module
-	// parameters.
+	// UpdateParams defines an operation for updating the x/staking module parameters.
+	// Since: cosmos-sdk 0.47
 	UpdateParams(ctx context.Context, in *MsgUpdateParams, opts ...grpc.CallOption) (*MsgUpdateParamsResponse, error)
 	// SetProposers defines a governance operation for setting which validators can propose blocks.
 	SetProposers(ctx context.Context, in *MsgSetProposers, opts ...grpc.CallOption) (*MsgSetProposersResponse, error)
@@ -137,8 +137,9 @@ func (c *msgClient) UpdateParams(ctx context.Context, in *MsgUpdateParams, opts 
 }
 
 func (c *msgClient) SetProposers(ctx context.Context, in *MsgSetProposers, opts ...grpc.CallOption) (*MsgSetProposersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(MsgSetProposersResponse)
-	err := c.cc.Invoke(ctx, Msg_SetProposers_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Msg_SetProposers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -167,8 +168,8 @@ type MsgServer interface {
 	// CancelUnbondingDelegation defines a method for performing canceling the unbonding delegation
 	// and delegate back to previous validator.
 	CancelUnbondingDelegation(context.Context, *MsgCancelUnbondingDelegation) (*MsgCancelUnbondingDelegationResponse, error)
-	// UpdateParams defines an operation for updating the x/staking module
-	// parameters.
+	// UpdateParams defines an operation for updating the x/staking module parameters.
+	// Since: cosmos-sdk 0.47
 	UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error)
 	// SetProposers defines a governance operation for setting which validators can propose blocks.
 	SetProposers(context.Context, *MsgSetProposers) (*MsgSetProposersResponse, error)

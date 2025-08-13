@@ -248,8 +248,9 @@ func (c *queryClient) Params(ctx context.Context, in *QueryParamsRequest, opts .
 }
 
 func (c *queryClient) Proposers(ctx context.Context, in *QueryProposersRequest, opts ...grpc.CallOption) (*QueryProposersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryProposersResponse)
-	err := c.cc.Invoke(ctx, Query_Proposers_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Query_Proposers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
