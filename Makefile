@@ -514,7 +514,7 @@ build-v50:
 	echo "Saving current reference..." && \
 	CURRENT_REF=$$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse HEAD) && \
 	echo "Checking out release branch..." && \
-	git checkout release/v0.50.x && \
+	git checkout dydx-fork-v0.50.5 && \
 	echo "Building v50 binary..." && \
 	make build && \
 	mv build/simd build/simdv50 && \
