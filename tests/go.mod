@@ -239,6 +239,6 @@ replace (
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 )
 
-replace github.com/cometbft/cometbft => github.com/01builders/dydx-cometbft v0.38.17-dydx-3
+replace github.com/cometbft/cometbft => github.com/01builders/dydx-cometbft v0.38.17-dydx-4
 
 replace cosmossdk.io/store => github.com/01builders/dydx-cosmos-sdk/store v1.1.2-dydx

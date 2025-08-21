@@ -213,6 +213,6 @@ retract (
 	v0.43.0
 )
 
-replace github.com/cometbft/cometbft => github.com/01builders/dydx-cometbft v0.38.17-dydx-3
+replace github.com/cometbft/cometbft => github.com/01builders/dydx-cometbft v0.38.17-dydx-4
 
 replace cosmossdk.io/store => github.com/01builders/dydx-cosmos-sdk/store v1.1.2-dydx
