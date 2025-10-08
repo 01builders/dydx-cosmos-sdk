@@ -24,9 +24,9 @@ import (
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
 	storemetrics "cosmossdk.io/store/metrics"
-	"cosmossdk.io/store/rootmulti"
 	"cosmossdk.io/store/snapshots"
 	storetypes "cosmossdk.io/store/types"
+	memiavlrootmulti "github.com/crypto-org-chain/cronos/store/rootmulti"
 
 	"github.com/cosmos/cosmos-sdk/baseapp/oe"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -494,7 +494,7 @@ func (app *BaseApp) setState(mode execMode, h cmtproto.Header) {
 	if mode == execModeCheck {
 		// Only support locking during check state. All other exec modes currently hold an exclusive lock on `mtx`
 		// and can use a normal branched multi store.
-		ms = app.cms.(*rootmulti.Store).LockingCacheMultiStore()
+		ms = app.cms.(*memiavlrootmulti.Store).LockingCacheMultiStore()
 	} else {
 		ms = app.cms.CacheMultiStore()
 	}
