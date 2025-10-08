@@ -201,7 +201,8 @@ replace cosmossdk.io/store => github.com/01builders/dydx-cosmos-sdk/store v0.5.6
 
 replace (
 	github.com/crypto-org-chain/cronos/memiavl => github.com/crypto-org-chain/cronos/memiavl v0.0.5-0.20241028093154-0f94930c27ce
-	github.com/crypto-org-chain/cronos/store => github.com/01builders/dydx-cronos/store v0.0.5-dydx
+	github.com/crypto-org-chain/cronos/store => github.com/01builders/dydx-cronos/store v0.0.5-dydx2
+
 )
 
 replace github.com/cometbft/cometbft => github.com/dydxprotocol/cometbft v0.38.6-0.20250807031327-f63a6917efaf
