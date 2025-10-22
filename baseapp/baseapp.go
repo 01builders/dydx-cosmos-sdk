@@ -24,7 +24,6 @@ import (
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
 	storemetrics "cosmossdk.io/store/metrics"
-	"cosmossdk.io/store/rootmulti"
 	"cosmossdk.io/store/snapshots"
 	storetypes "cosmossdk.io/store/types"
 
@@ -492,9 +491,24 @@ func (app *BaseApp) IsSealed() bool { return app.sealed }
 func (app *BaseApp) setState(mode execMode, h cmtproto.Header) {
 	var ms storetypes.CacheMultiStore
 	if mode == execModeCheck {
-		// Only support locking during check state. All other exec modes currently hold an exclusive lock on `mtx`
-		// and can use a normal branched multi store.
-		ms = app.cms.(*rootmulti.Store).LockingCacheMultiStore()
+		// HARD REQUIREMENT: For concurrent CheckTx we require a CommitMultiStore that
+		// exposes LockingCacheMultiStore(). If it doesn't, we panic immediately so
+		// misconfiguration is caught at startup instead of silently running without
+		// the intended read lock semantics.
+		//
+		// Note: we intentionally use an interface assertion here instead of a
+		// concrete type assertion to a specific rootmulti implementation because the
+		// underlying CommitMultiStore can be either
+		// "cosmossdk.io/store/rootmulti" or
+		// "github.com/crypto-org-chain/cronos/store/rootmulti" depending on whether
+		// memiavl is enabled.
+		l, ok := app.cms.(interface {
+			LockingCacheMultiStore() storetypes.CacheMultiStore
+		})
+		if !ok {
+			panic(fmt.Sprintf("CommitMultiStore (%T) does not implement LockingCacheMultiStore() required in execModeCheck", app.cms))
+		}
+		ms = l.LockingCacheMultiStore()
 	} else {
 		ms = app.cms.CacheMultiStore()
 	}
