@@ -98,7 +98,7 @@ func (oe *OptimisticExecution) Execute(req *abci.RequestProcessProposal) {
 		ProposerAddress:    req.ProposerAddress,
 	}
 
-	oe.logger.Debug("OE started", "height", req.Height, "hash", hex.EncodeToString(req.Hash), "time", req.Time.String())
+	oe.logger.Info("OE started", "height", req.Height, "hash", hex.EncodeToString(req.Hash), "time", req.Time.String())
 	ctx, cancel := context.WithCancel(context.Background())
 	oe.cancelFunc = cancel
 	oe.initialized = true
@@ -110,7 +110,7 @@ func (oe *OptimisticExecution) Execute(req *abci.RequestProcessProposal) {
 		oe.mtx.Lock()
 
 		executionTime := time.Since(start)
-		oe.logger.Debug("OE finished", "duration", executionTime.String(), "height", oe.request.Height, "hash", hex.EncodeToString(oe.request.Hash))
+		oe.logger.Info("OE finished", "duration", executionTime.String(), "height", oe.request.Height, "hash", hex.EncodeToString(oe.request.Hash))
 		oe.response, oe.err = resp, err
 
 		close(oe.stopCh)
@@ -120,7 +120,7 @@ func (oe *OptimisticExecution) Execute(req *abci.RequestProcessProposal) {
 
 // AbortIfNeeded aborts the OE if the request hash is not the same as the one in
 // the running OE. Returns true if the OE was aborted.
-func (oe *OptimisticExecution) AbortIfNeeded(reqHash []byte) bool {
+func (oe *OptimisticExecution) AbortIfNeeded(req *abci.RequestFinalizeBlock) bool {
 	if oe == nil {
 		return false
 	}
@@ -128,8 +128,8 @@ func (oe *OptimisticExecution) AbortIfNeeded(reqHash []byte) bool {
 	oe.mtx.Lock()
 	defer oe.mtx.Unlock()
 
-	if !bytes.Equal(oe.request.Hash, reqHash) {
-		oe.logger.Error("OE aborted due to hash mismatch", "oe_hash", hex.EncodeToString(oe.request.Hash), "req_hash", hex.EncodeToString(reqHash), "oe_height", oe.request.Height, "req_height", oe.request.Height)
+	if !bytes.Equal(oe.request.Hash, req.Hash) {
+		oe.logger.Error("OE aborted due to hash mismatch", "oe_hash", hex.EncodeToString(oe.request.Hash), "req_hash", hex.EncodeToString(req.Hash), "oe_height", oe.request.Height, "req_height", req.Height)
 		oe.cancelFunc()
 		return true
 	} else if oe.abortRate > 0 && rand.Intn(100) < oe.abortRate {
@@ -147,6 +147,12 @@ func (oe *OptimisticExecution) AbortIfNeeded(reqHash []byte) bool {
 func (oe *OptimisticExecution) Abort() {
 	if oe == nil || oe.cancelFunc == nil {
 		return
+	}
+
+	if oe.request != nil {
+		oe.logger.Info("OE aborted", "height", oe.request.Height, "hash", hex.EncodeToString(oe.request.Hash))
+	} else {
+		oe.logger.Info("OE aborted (oe.request is nil)")
 	}
 
 	oe.cancelFunc()

@@ -37,6 +37,9 @@ const (
 )
 
 func (app *BaseApp) InitChain(req *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if req.ChainId != app.chainID {
 		return nil, fmt.Errorf("invalid chain-id on InitChain; expected: %s, got: %s", app.chainID, req.ChainId)
 	}
@@ -135,6 +138,9 @@ func (app *BaseApp) InitChain(req *abci.RequestInitChain) (*abci.ResponseInitCha
 }
 
 func (app *BaseApp) Info(_ *abci.RequestInfo) (*abci.ResponseInfo, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	lastCommitID := app.cms.LastCommitID()
 
 	return &abci.ResponseInfo{
@@ -149,6 +155,9 @@ func (app *BaseApp) Info(_ *abci.RequestInfo) (*abci.ResponseInfo, error) {
 // Query implements the ABCI interface. It delegates to CommitMultiStore if it
 // implements Queryable.
 func (app *BaseApp) Query(_ context.Context, req *abci.RequestQuery) (resp *abci.ResponseQuery, err error) {
+	app.mtx.RLock()
+	defer app.mtx.RUnlock()
+
 	// add panic recovery for all queries
 	//
 	// Ref: https://github.com/cosmos/cosmos-sdk/pull/8039
@@ -202,6 +211,9 @@ func (app *BaseApp) Query(_ context.Context, req *abci.RequestQuery) (resp *abci
 
 // ListSnapshots implements the ABCI interface. It delegates to app.snapshotManager if set.
 func (app *BaseApp) ListSnapshots(req *abci.RequestListSnapshots) (*abci.ResponseListSnapshots, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	resp := &abci.ResponseListSnapshots{Snapshots: []*abci.Snapshot{}}
 	if app.snapshotManager == nil {
 		return resp, nil
@@ -228,6 +240,9 @@ func (app *BaseApp) ListSnapshots(req *abci.RequestListSnapshots) (*abci.Respons
 
 // LoadSnapshotChunk implements the ABCI interface. It delegates to app.snapshotManager if set.
 func (app *BaseApp) LoadSnapshotChunk(req *abci.RequestLoadSnapshotChunk) (*abci.ResponseLoadSnapshotChunk, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.snapshotManager == nil {
 		return &abci.ResponseLoadSnapshotChunk{}, nil
 	}
@@ -249,6 +264,9 @@ func (app *BaseApp) LoadSnapshotChunk(req *abci.RequestLoadSnapshotChunk) (*abci
 
 // OfferSnapshot implements the ABCI interface. It delegates to app.snapshotManager if set.
 func (app *BaseApp) OfferSnapshot(req *abci.RequestOfferSnapshot) (*abci.ResponseOfferSnapshot, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.snapshotManager == nil {
 		app.logger.Error("snapshot manager not configured")
 		return &abci.ResponseOfferSnapshot{Result: abci.ResponseOfferSnapshot_ABORT}, nil
@@ -298,6 +316,9 @@ func (app *BaseApp) OfferSnapshot(req *abci.RequestOfferSnapshot) (*abci.Respons
 
 // ApplySnapshotChunk implements the ABCI interface. It delegates to app.snapshotManager if set.
 func (app *BaseApp) ApplySnapshotChunk(req *abci.RequestApplySnapshotChunk) (*abci.ResponseApplySnapshotChunk, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.snapshotManager == nil {
 		app.logger.Error("snapshot manager not configured")
 		return &abci.ResponseApplySnapshotChunk{Result: abci.ResponseApplySnapshotChunk_ABORT}, nil
@@ -347,7 +368,7 @@ func (app *BaseApp) CheckTx(req *abci.RequestCheckTx) (*abci.ResponseCheckTx, er
 		return nil, fmt.Errorf("unknown RequestCheckTx type: %s", req.Type)
 	}
 
-	gInfo, result, anteEvents, err := app.runTx(mode, req.Tx)
+	gInfo, result, anteEvents, err := app.runCheckTxConcurrently(mode, req.Tx)
 	if err != nil {
 		return sdkerrors.ResponseCheckTxWithEvents(err, gInfo.GasWanted, gInfo.GasUsed, anteEvents, app.trace), nil
 	}
@@ -375,9 +396,20 @@ func (app *BaseApp) CheckTx(req *abci.RequestCheckTx) (*abci.ResponseCheckTx, er
 // Ref: https://github.com/cosmos/cosmos-sdk/blob/main/docs/architecture/adr-060-abci-1.0.md
 // Ref: https://github.com/cometbft/cometbft/blob/main/spec/abci/abci%2B%2B_basic_concepts.md
 func (app *BaseApp) PrepareProposal(req *abci.RequestPrepareProposal) (resp *abci.ResponsePrepareProposal, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.prepareProposal == nil {
 		return nil, errors.New("PrepareProposal handler not set")
 	}
+
+	// Abort any running OE so it cannot overlap with `PrepareProposal`. This could happen if optimistic
+	// `internalFinalizeBlock` from previous round takes a long time, but consensus has moved on to next round.
+	// Overlap is undesirable, since `internalFinalizeBlock` and `PrepareProoposal` could share access to
+	// in-memory structs depending on application implementation.
+	// No-op if OE is not enabled.
+	// Similar call to Abort() is done in `ProcessProposal`.
+	app.optimisticExec.Abort()
 
 	// Always reset state given that PrepareProposal can timeout and be called
 	// again in a subsequent round.
@@ -453,6 +485,9 @@ func (app *BaseApp) PrepareProposal(req *abci.RequestPrepareProposal) (resp *abc
 // Ref: https://github.com/cosmos/cosmos-sdk/blob/main/docs/architecture/adr-060-abci-1.0.md
 // Ref: https://github.com/cometbft/cometbft/blob/main/spec/abci/abci%2B%2B_basic_concepts.md
 func (app *BaseApp) ProcessProposal(req *abci.RequestProcessProposal) (resp *abci.ResponseProcessProposal, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.processProposal == nil {
 		return nil, errors.New("ProcessProposal handler not set")
 	}
@@ -549,6 +584,9 @@ func (app *BaseApp) ProcessProposal(req *abci.RequestProcessProposal) (resp *abc
 // height and are committed in the subsequent height, i.e. H+2. An error is
 // returned if vote extensions are not enabled or if extendVote fails or panics.
 func (app *BaseApp) ExtendVote(_ context.Context, req *abci.RequestExtendVote) (resp *abci.ResponseExtendVote, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	// Always reset state given that ExtendVote and VerifyVoteExtension can timeout
 	// and be called again in a subsequent round.
 	var ctx sdk.Context
@@ -622,6 +660,9 @@ func (app *BaseApp) ExtendVote(_ context.Context, req *abci.RequestExtendVote) (
 // phase. The response MUST be deterministic. An error is returned if vote
 // extensions are not enabled or if verifyVoteExt fails or panics.
 func (app *BaseApp) VerifyVoteExtension(req *abci.RequestVerifyVoteExtension) (resp *abci.ResponseVerifyVoteExtension, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	if app.verifyVoteExt == nil {
 		return nil, errors.New("application VerifyVoteExtension handler not set")
 	}
@@ -837,6 +878,8 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 		TxResults:             txResults,
 		ValidatorUpdates:      endBlock.ValidatorUpdates,
 		ConsensusParamUpdates: &cp,
+		// If `NextBlockDelay` is 0, cometbft uses the legacy config `TimeoutCommit` instead.
+		NextBlockDelay: app.GetNextBlockDelay(app.finalizeBlockState.Context()),
 	}, nil
 }
 
@@ -851,6 +894,9 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 // extensions into the proposal, which should not themselves be executed in cases
 // where they adhere to the sdk.Tx interface.
 func (app *BaseApp) FinalizeBlock(req *abci.RequestFinalizeBlock) (res *abci.ResponseFinalizeBlock, err error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	defer func() {
 		// call the streaming service hooks with the FinalizeBlock messages
 		for _, streamingListener := range app.streamingManager.ABCIListeners {
@@ -862,9 +908,11 @@ func (app *BaseApp) FinalizeBlock(req *abci.RequestFinalizeBlock) (res *abci.Res
 
 	if app.optimisticExec.Initialized() {
 		// check if the hash we got is the same as the one we are executing
-		aborted := app.optimisticExec.AbortIfNeeded(req.Hash)
+		aborted := app.optimisticExec.AbortIfNeeded(req)
 		// Wait for the OE to finish, regardless of whether it was aborted or not
 		res, err = app.optimisticExec.WaitResult()
+
+		app.optimisticExec.Reset()
 
 		// only return if we are not aborting
 		if !aborted {
@@ -877,7 +925,6 @@ func (app *BaseApp) FinalizeBlock(req *abci.RequestFinalizeBlock) (res *abci.Res
 
 		// if it was aborted, we need to reset the state
 		app.finalizeBlockState = nil
-		app.optimisticExec.Reset()
 	}
 
 	// if no OE is running, just run the block (this is either a block replay or a OE that got aborted)
@@ -915,6 +962,9 @@ func (app *BaseApp) checkHalt(height int64, time time.Time) error {
 // against that height and gracefully halt if it matches the latest committed
 // height.
 func (app *BaseApp) Commit() (*abci.ResponseCommit, error) {
+	app.mtx.Lock()
+	defer app.mtx.Unlock()
+
 	header := app.finalizeBlockState.Context().BlockHeader()
 	retainHeight := app.GetBlockRetentionHeight(header.Height)
 
@@ -988,6 +1038,7 @@ func handleQueryApp(app *BaseApp, path []string, req *abci.RequestQuery) *abci.R
 		case "simulate":
 			txBytes := req.Data
 
+			// Simulate must not recursively re-enter and attempt to acquire `app.mtx`.
 			gInfo, res, err := app.Simulate(txBytes)
 			if err != nil {
 				return sdkerrors.QueryResult(errorsmod.Wrap(err, "failed to simulate tx"), app.trace)
@@ -1136,6 +1187,7 @@ func (app *BaseApp) handleQueryGRPC(handler GRPCQueryHandler, req *abci.RequestQ
 		return sdkerrors.QueryResult(err, app.trace)
 	}
 
+	// handler must not recursively re-enter and attempt to acquire `app.mtx`.
 	resp, err := handler(ctx, req)
 	if err != nil {
 		resp = sdkerrors.QueryResult(gRPCErrorToSDKError(err), app.trace)
@@ -1217,7 +1269,18 @@ func (app *BaseApp) CreateQueryContext(height int64, prove bool) (sdk.Context, e
 			)
 	}
 
-	cacheMS, err := qms.CacheMultiStoreWithVersion(height)
+	// Acquire an exclusive lock to ensure that the multistore can be versioned.
+	// Internally the multistore updates version ranges while loading which leads to data races.
+	// If there are upstream changes to the multistore to make it use locks effectively
+	// in this scenario then we could remove this lock.
+	var cacheMS storetypes.CacheMultiStore
+	var err error
+	func() {
+		app.cacheMsWithVersionMtx.Lock()
+		defer app.cacheMsWithVersionMtx.Unlock()
+		cacheMS, err = qms.CacheMultiStoreWithVersion(height)
+	}()
+
 	if err != nil {
 		return sdk.Context{},
 			errorsmod.Wrapf(

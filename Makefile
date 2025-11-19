@@ -13,6 +13,7 @@ MOCKS_DIR = $(CURDIR)/tests/mocks
 HTTPS_GIT := https://github.com/cosmos/cosmos-sdk.git
 DOCKER := $(shell which docker)
 PROJECT_NAME = $(shell git remote get-url origin | xargs basename -s .git)
+CGO_ENABLED=1
 
 # process build tags
 build_tags = netgo
@@ -37,10 +38,6 @@ ifeq ($(LEDGER_ENABLED),true)
 		endif
 	endif
 	endif
-endif
-
-ifeq (secp,$(findstring secp,$(COSMOS_BUILD_OPTIONS)))
-  build_tags += libsecp256k1_sdk
 endif
 
 ifeq (legacy,$(findstring legacy,$(COSMOS_BUILD_OPTIONS)))
@@ -467,10 +464,10 @@ localnet-build-dlv:
 localnet-build-nodes:
 	$(DOCKER) run --rm -v $(CURDIR)/.testnets:/data cosmossdk/simd \
 			  testnet init-files --v 4 -o /data --starting-ip-address 192.168.10.2 --keyring-backend=test
-	docker-compose up -d
+	docker compose up -d
 
 localnet-stop:
-	docker-compose down
+	docker compose down
 
 # localnet-start will run a 4-node testnet locally. The nodes are
 # based off the docker images in: ./contrib/images/simd-env
